@@ -108,8 +108,7 @@ const complaintSchema = new mongoose.Schema({
     default: 'submitted'
   },
   complaintId: {
-    type: String,
-    unique: true
+    type: String
   },
   
   // Tracking and Updates

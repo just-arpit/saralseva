@@ -19,14 +19,12 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Email is required'],
-    unique: true,
     lowercase: true,
     match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
   },
   phone: {
     type: String,
     required: [true, 'Phone number is required'],
-    unique: true,
     match: [/^[6-9]\d{9}$/, 'Please provide a valid 10-digit Indian mobile number']
   },
   password: {
@@ -39,13 +37,11 @@ const userSchema = new mongoose.Schema({
   // Government IDs
   aadhaar: {
     type: String,
-    unique: true,
     sparse: true,
     match: [/^\d{12}$/, 'Aadhaar must be 12 digits']
   },
   pan: {
     type: String,
-    unique: true,
     sparse: true,
     uppercase: true,
     match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format']
@@ -218,10 +214,10 @@ userSchema.virtual('fullName').get(function() {
 });
 
 // Index for search optimization
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
-userSchema.index({ aadhaar: 1 });
-userSchema.index({ pan: 1 });
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ phone: 1 }, { unique: true });
+userSchema.index({ aadhaar: 1 }, { unique: true, sparse: true });
+userSchema.index({ pan: 1 }, { unique: true, sparse: true });
 userSchema.index({ 'address.state': 1 });
 userSchema.index({ occupation: 1 });
 userSchema.index({ category: 1 });
