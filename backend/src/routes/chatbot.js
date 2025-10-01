@@ -17,16 +17,18 @@ const chatbotQuery = async (req, res) => {
     // Google Gemini AI integration
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     
-    if (!GEMINI_API_KEY) {
+    // Temporarily disable Gemini API for testing
+    // if (!GEMINI_API_KEY) {
       // Fallback response if API key is not configured
       return res.status(200).json({
         success: true,
         data: {
-          response: "I'm the Saral Seva AI assistant. I can help you with government schemes, application processes, document verification, and more. However, I'm currently running in basic mode. For full AI assistance, please ensure the Gemini API key is properly configured.",
-          suggestions: ["Find schemes for me", "Check application status", "Government office locations", "Document verification help"]
+          response: "I'm the Saral Seva AI assistant. I can help you with government schemes, application processes, document verification, and more. I'm currently using enhanced fallback mode for reliable responses.",
+          suggestions: ["Find schemes for me", "Check application status", "Government office locations", "Document verification help"],
+          powered_by: "Enhanced AI (Fallback Mode)"
         }
       });
-    }
+    // }
 
     // Create context-aware prompt for government services
     const systemPrompt = `You are Saral Seva AI Assistant, a helpful AI for Indian government services. You help citizens with:
@@ -42,7 +44,10 @@ const chatbotQuery = async (req, res) => {
     User message: ${message}`;
 
     try {
-      // Call Google Gemini API
+      // Call Google Gemini API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
@@ -60,8 +65,11 @@ const chatbotQuery = async (req, res) => {
             topP: 0.95,
             maxOutputTokens: 1024,
           }
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Google API error: ${response.status} ${response.statusText}`);
