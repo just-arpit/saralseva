@@ -15,14 +15,14 @@ const chatbotQuery = async (req, res) => {
     }
 
     // Google Gemini AI integration
-    const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     
-    if (!GOOGLE_API_KEY) {
+    if (!GEMINI_API_KEY) {
       // Fallback response if API key is not configured
       return res.status(200).json({
         success: true,
         data: {
-          response: "I'm the Saral Seva AI assistant. I can help you with government schemes, application processes, document verification, and more. However, I'm currently running in basic mode. Please contact support for full AI assistance.",
+          response: "I'm the Saral Seva AI assistant. I can help you with government schemes, application processes, document verification, and more. However, I'm currently running in basic mode. For full AI assistance, please ensure the Gemini API key is properly configured.",
           suggestions: ["Find schemes for me", "Check application status", "Government office locations", "Document verification help"]
         }
       });
@@ -41,36 +41,63 @@ const chatbotQuery = async (req, res) => {
     
     User message: ${message}`;
 
-    // Call Google Gemini API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GOOGLE_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: systemPrompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
+    try {
+      // Call Google Gemini API
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: systemPrompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process your request at the moment. Please try again.";
+
+      // Generate contextual suggestions based on the query
+      const suggestions = generateSuggestions(message.toLowerCase());
+
+      res.status(200).json({
+        success: true,
+        data: {
+          response: aiResponse,
+          suggestions: suggestions,
+          powered_by: "Google Gemini AI"
         }
-      })
-    });
+      });
 
-    if (!response.ok) {
-      throw new Error(`Google API error: ${response.status}`);
+    } catch (geminiError) {
+      console.warn('Gemini API failed, using fallback response:', geminiError.message);
+      
+      // Enhanced fallback response based on query analysis
+      const fallbackResponse = generateFallbackResponse(message);
+      const suggestions = generateSuggestions(message.toLowerCase());
+
+      res.status(200).json({
+        success: true,
+        data: {
+          response: fallbackResponse,
+          suggestions: suggestions,
+          powered_by: "Enhanced AI (Fallback Mode)"
+        }
+      });
     }
-
-    const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process your request at the moment. Please try again.";
-
-    // Generate contextual suggestions based on the query
-    const suggestions = generateSuggestions(message.toLowerCase());
 
     res.status(200).json({
       success: true,
@@ -91,6 +118,33 @@ const chatbotQuery = async (req, res) => {
       }
     });
   }
+};
+
+// Helper function to generate fallback responses
+const generateFallbackResponse = (message) => {
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('scheme') || lowerMessage.includes('eligibility')) {
+    return "I can help you find government schemes! Some popular schemes include PM-KISAN for farmers, Ayushman Bharat for healthcare, and various scholarships for students. To check your eligibility, please provide details about your age, income, category, and state.";
+  }
+  
+  if (lowerMessage.includes('apply') || lowerMessage.includes('application')) {
+    return "For government scheme applications, you can visit official portals like Digital India, PMO website, or specific ministry websites. Most applications require documents like Aadhaar, PAN card, and bank account details. I can guide you to the right portal if you specify which scheme you're interested in.";
+  }
+  
+  if (lowerMessage.includes('document') || lowerMessage.includes('verify')) {
+    return "For document verification, you can use DigiLocker for storing digital documents, or visit official government portals. Common documents needed are Aadhaar, PAN, voter ID, and educational certificates. Let me know which specific document you need help with.";
+  }
+  
+  if (lowerMessage.includes('farmer') || lowerMessage.includes('agriculture')) {
+    return "For farmers, key schemes include PM-KISAN (₹6000/year), Crop Insurance, KCC (Kisan Credit Card), and various state-specific schemes. You can check eligibility and apply through PM-KISAN portal or your nearest Common Service Center.";
+  }
+  
+  if (lowerMessage.includes('student') || lowerMessage.includes('scholarship')) {
+    return "Students can benefit from National Scholarship Portal, Merit-cum-Means scholarships, and various central/state scholarships. Eligibility typically depends on family income, academic performance, and category. Visit scholarships.gov.in for more details.";
+  }
+  
+  return "I'm here to help you with government schemes, applications, document verification, and more! You can ask me about eligibility criteria, application processes, or specific schemes like PM-KISAN, Ayushman Bharat, scholarships, and others.";
 };
 
 // Helper function to generate contextual suggestions

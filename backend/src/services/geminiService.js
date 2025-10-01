@@ -5,6 +5,8 @@ class EnhancedAIService {
   constructor() {
     this.schemes = [];
     this.initialized = false;
+    this.apiKey = process.env.GEMINI_API_KEY;
+    this.apiUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent';
   }
 
   async initialize() {
@@ -41,8 +43,19 @@ class EnhancedAIService {
       // Prepare context with relevant schemes
       const context = this.prepareContext(query);
       
-      // For now, use enhanced keyword-based responses until Gemini API is fixed
-      const response = await this.generateEnhancedResponse(query, context, userProfile, language);
+      // Try Gemini API first, fallback to enhanced responses
+      let response;
+      if (this.apiKey) {
+        try {
+          response = await this.generateGeminiResponse(query, context, userProfile, language);
+        } catch (geminiError) {
+          console.warn('Gemini API failed, using enhanced fallback:', geminiError.message);
+          response = await this.generateEnhancedResponse(query, context, userProfile, language);
+        }
+      } else {
+        console.warn('Gemini API key not found, using enhanced fallback');
+        response = await this.generateEnhancedResponse(query, context, userProfile, language);
+      }
       
       return {
         answer: response.text,
@@ -113,6 +126,149 @@ class EnhancedAIService {
     return relevantSchemes
       .sort((a, b) => b.relevance - a.relevance)
       .slice(0, 5);
+  }
+
+  async generateGeminiResponse(query, context, userProfile, language) {
+    try {
+      // Prepare the context information
+      let contextInfo = '';
+      if (context.length > 0) {
+        contextInfo = '\n\nRelevant Government Schemes Information:\n';
+        context.forEach((scheme, index) => {
+          contextInfo += `${index + 1}. ${scheme.name}\n`;
+          contextInfo += `   Description: ${scheme.shortDescription}\n`;
+          contextInfo += `   Category: ${scheme.category}\n`;
+          contextInfo += `   Department: ${scheme.department.name}\n`;
+          
+          if (scheme.eligibility) {
+            contextInfo += `   Eligibility: `;
+            const eligibility = scheme.eligibility;
+            if (eligibility.ageRange) {
+              contextInfo += `Age ${eligibility.ageRange.min || 0}-${eligibility.ageRange.max || 100} years, `;
+            }
+            if (eligibility.incomeRange) {
+              contextInfo += `Income ₹${eligibility.incomeRange.min || 0}-${eligibility.incomeRange.max || 'unlimited'}, `;
+            }
+            if (eligibility.category && eligibility.category.length > 0) {
+              contextInfo += `Categories: ${eligibility.category.join(', ')}, `;
+            }
+            if (eligibility.states && eligibility.states.length > 0) {
+              contextInfo += `States: ${eligibility.states.join(', ')}, `;
+            }
+            contextInfo = contextInfo.slice(0, -2) + '\n';
+          }
+          
+          if (scheme.benefits) {
+            contextInfo += `   Benefits: ${scheme.benefits.description}\n`;
+            if (scheme.benefits.amount) {
+              contextInfo += `   Amount: ₹${scheme.benefits.amount.min || 0} - ₹${scheme.benefits.amount.max || 'unlimited'}\n`;
+            }
+          }
+          
+          if (scheme.applicationProcess) {
+            contextInfo += `   Application: ${scheme.applicationProcess.isOnline ? 'Online' : 'Offline'}`;
+            if (scheme.applicationProcess.onlineUrl) {
+              contextInfo += ` (${scheme.applicationProcess.onlineUrl})`;
+            }
+            contextInfo += '\n';
+          }
+          
+          contextInfo += '\n';
+        });
+      }
+
+      // Add user profile information if available
+      let userInfo = '';
+      if (userProfile) {
+        userInfo = '\n\nUser Profile Information:\n';
+        if (userProfile.age) userInfo += `Age: ${userProfile.age} years\n`;
+        if (userProfile.gender) userInfo += `Gender: ${userProfile.gender}\n`;
+        if (userProfile.income) userInfo += `Annual Income: ₹${userProfile.income}\n`;
+        if (userProfile.category) userInfo += `Category: ${userProfile.category}\n`;
+        if (userProfile.state) userInfo += `State: ${userProfile.state}\n`;
+        if (userProfile.education) userInfo += `Education: ${userProfile.education}\n`;
+        if (userProfile.occupation) userInfo += `Occupation: ${userProfile.occupation}\n`;
+      }
+
+      // Create system prompt
+      const systemPrompt = `You are Saral Seva AI Assistant, an expert on Indian government schemes and services. Your role is to help citizens with:
+- Government schemes and eligibility
+- Application processes and status
+- Document verification
+- Government office locations
+- Tax-related queries
+- Digital services and e-governance
+
+Always provide accurate, helpful, and specific guidance. When discussing eligibility, be precise about criteria. When explaining application processes, give step-by-step instructions. Keep responses concise but informative.
+
+${language === 'hi' ? 'Please respond in Hindi using Devanagari script.' : 'Please respond in English.'}`;
+
+      // Create the full prompt
+      const fullPrompt = `${systemPrompt}${contextInfo}${userInfo}
+
+User Query: "${query}"
+
+Please provide a helpful, accurate response about government schemes. If the user is asking about eligibility, provide specific eligibility criteria. If asking about benefits, explain the benefits clearly. If asking about application process, provide step-by-step guidance.
+
+Format your response to be clear and actionable. Include relevant scheme names and specific details when available.`;
+
+      // Call Gemini API
+      const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: fullPrompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process your request at the moment. Please try again.";
+
+      // Extract relevant schemes for the response
+      const relevantSchemes = context.map(scheme => ({
+        id: scheme._id.toString(),
+        name: scheme.name,
+        description: scheme.shortDescription,
+        similarity: Math.min(scheme.relevance / 5, 1),
+        eligibility: scheme.eligibility,
+        benefits: scheme.benefits,
+        applicationProcess: scheme.applicationProcess
+      }));
+
+      // Create sources
+      const sources = context.map(scheme => ({
+        schemeName: scheme.name,
+        department: scheme.department.name,
+        similarity: Math.min(scheme.relevance / 5, 1)
+      }));
+
+      return {
+        text,
+        relevantSchemes,
+        confidence: context.length > 0 ? 95 : 80,
+        sources
+      };
+
+    } catch (error) {
+      console.error('Error generating Gemini response:', error);
+      throw error;
+    }
   }
 
   async generateEnhancedResponse(query, context, userProfile, language) {
@@ -684,17 +840,52 @@ Format your response to be clear and actionable. Include relevant scheme names a
 
   async getHealthStatus() {
     try {
+      const hasApiKey = !!this.apiKey;
+      let geminiStatus = 'disabled';
+      
+      if (hasApiKey) {
+        try {
+          // Test Gemini API with a simple query
+          const testResponse = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: 'Hello, can you help with government schemes?'
+                }]
+              }],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 50,
+              }
+            })
+          });
+          
+          geminiStatus = testResponse.ok ? 'healthy' : 'error';
+        } catch (error) {
+          geminiStatus = 'error';
+        }
+      }
+      
       return {
         status: 'healthy',
-        model: 'enhanced-ai',
+        model: hasApiKey ? 'gemini-pro' : 'enhanced-ai',
+        geminiApi: geminiStatus,
+        apiKeyConfigured: hasApiKey,
         schemesLoaded: this.schemes.length,
-        features: ['eligibility-check', 'application-guidance', 'benefit-analysis', 'multilingual-support']
+        features: hasApiKey 
+          ? ['gemini-ai', 'eligibility-check', 'application-guidance', 'benefit-analysis', 'multilingual-support']
+          : ['enhanced-ai', 'eligibility-check', 'application-guidance', 'benefit-analysis', 'multilingual-support']
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         error: error.message,
-        schemesLoaded: this.schemes.length
+        schemesLoaded: this.schemes.length,
+        apiKeyConfigured: !!this.apiKey
       };
     }
   }
