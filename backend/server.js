@@ -117,10 +117,15 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Saral Seva Backend running on port ${PORT}`);
   console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
   console.log(`🏥 Health check available at http://localhost:${PORT}/health`);
+}).on('error', (err) => {
+  console.error('❌ Server startup error:', err);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`⚠️  Port ${PORT} is already in use. Please use a different port or kill the existing process.`);
+  }
 });
 
 export default app;
