@@ -90,27 +90,30 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
+    const currentMessageCount = messages.length;
+    
     const userMessage = {
-      id: messages.length + 1,
+      id: currentMessageCount + 1,
       type: "user",
       content: inputMessage,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = inputMessage; // Store the input before clearing
     setInputMessage("");
     setIsTyping(true);
 
     try {
       // Use local bot response for immediate functionality
-      const botResponse = await generateLocalBotResponse(inputMessage);
+      const botResponse = await generateLocalBotResponse(userInput);
       setMessages(prev => [...prev, botResponse]);
       
     } catch (error) {
       console.error('Error generating response:', error);
       
       const errorResponse = {
-        id: messages.length + 2,
+        id: currentMessageCount + 2,
         type: "bot",
         content: "I apologize, but I'm having trouble processing your request right now. Please try asking again or rephrase your question.",
         timestamp: new Date(),
@@ -189,7 +192,7 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
     }
 
     return {
-      id: messages.length + 2,
+      id: Date.now(), // Use timestamp instead of messages.length
       type: "bot",
       content: response,
       timestamp: new Date(),
@@ -338,21 +341,23 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
+            <div className={`max-w-[85%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
               <div
-                className={`p-3 rounded-lg ${
+                className={`p-3 rounded-lg break-words ${
                   message.type === 'user'
                     ? 'bg-primary text-primary-foreground ml-2'
                     : 'bg-muted mr-2'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
+                <div className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                  {message.content}
+                </div>
                 
                 {/* AI Response Metadata */}
                 {message.type === 'bot' && message.confidence && (
-                  <div className="flex items-center gap-2 mt-2 text-xs opacity-70">
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-xs opacity-70">
                     <div className="flex items-center gap-1">
-                      <Shield className="h-3 w-3" />
+                      <Shield className="h-3 w-3 flex-shrink-0" />
                       <span>Confidence: {message.confidence}%</span>
                     </div>
                     {message.sources && message.sources.length > 0 && (
@@ -360,7 +365,7 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowSources(!showSources)}
-                        className="h-5 px-2 text-xs"
+                        className="h-5 px-2 text-xs flex-shrink-0"
                       >
                         <Info className="h-3 w-3 mr-1" />
                         Sources ({message.sources.length})
@@ -376,13 +381,12 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
               
               {/* Sources */}
               {message.type === 'bot' && message.sources && showSources && (
-                <div className="mt-2 p-2 bg-accent/50 rounded-lg mr-2">
+                <div className="mt-2 p-2 bg-accent/50 rounded-lg mr-2 break-words">
                   <h4 className="text-xs font-semibold mb-2">Sources:</h4>
                   {message.sources.map((source, index) => (
-                    <div key={index} className="text-xs mb-1 flex items-center gap-2">
-                      <ExternalLink className="h-3 w-3" />
-                      <span>{source.schemeName}</span>
-                      <span className="opacity-60">({Math.round(source.similarity * 100)}% match)</span>
+                    <div key={index} className="text-xs mb-1 flex items-center gap-2 break-words">
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                      <span className="break-words">{source}</span>
                     </div>
                   ))}
                 </div>
@@ -393,14 +397,14 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
                 <div className="mt-2 space-y-2 mr-2">
                   <h4 className="text-xs font-semibold">Relevant Schemes:</h4>
                   {message.relevantSchemes.slice(0, 3).map((scheme, index) => (
-                    <div key={index} className="p-2 bg-accent/30 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium">{scheme.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {Math.round(scheme.similarity * 100)}% match
+                    <div key={index} className="p-2 bg-accent/30 rounded-lg break-words">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-medium break-words flex-1">{scheme.name}</span>
+                        <Badge variant="secondary" className="text-xs flex-shrink-0">
+                          NaN% match
                         </Badge>
                       </div>
-                      <p className="text-xs opacity-70 mt-1">{scheme.description}</p>
+                      <p className="text-xs opacity-70 mt-1 break-words">{scheme.category}</p>
                     </div>
                   ))}
                 </div>
@@ -408,16 +412,16 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
               
               {/* Suggestions */}
               {message.suggestions && message.suggestions.length > 0 && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 flex flex-wrap gap-1">
                   {message.suggestions.map((suggestion, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="sm"
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className="mr-2 mb-1 text-xs h-7"
+                      className="text-xs h-7 break-words whitespace-normal max-w-full"
                     >
-                      {suggestion}
+                      <span className="truncate">{suggestion}</span>
                     </Button>
                   ))}
                 </div>
