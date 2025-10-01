@@ -342,9 +342,9 @@ const SarkarQnA = () => {
                 </div>
               </CardHeader>
 
-              <CardContent className="flex-1 flex flex-col p-0">
+              <CardContent className="flex-1 flex flex-col p-0 chat-container">
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 prevent-overflow">
                   {messages.length === 0 && (
                     <div className="text-center text-gray-500 mt-8">
                       <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -353,20 +353,22 @@ const SarkarQnA = () => {
                   )}
 
                   {messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
+                    <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                      <div className={`max-w-[85%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
                         <div
-                          className={`p-4 rounded-lg ${
+                          className={`p-4 rounded-lg break-words overflow-hidden ${
                             message.type === 'user'
                               ? 'bg-primary text-primary-foreground ml-2'
                               : 'bg-muted mr-2'
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          <div className="text-sm whitespace-pre-wrap break-words word-wrap overflow-wrap-anywhere">
+                            {message.content}
+                          </div>
                           
                           {/* AI Response Metadata */}
                           {message.type === 'bot' && message.confidence !== undefined && (
-                            <div className="flex items-center gap-4 mt-3 text-xs opacity-70">
+                            <div className="flex flex-wrap items-center gap-2 mt-3 text-xs opacity-70">
                               <div className="flex items-center gap-1">
                                 {getConfidenceIcon(message.confidence)}
                                 <span className={getConfidenceColor(message.confidence)}>
@@ -378,7 +380,7 @@ const SarkarQnA = () => {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => setShowSources(!showSources)}
-                                  className="h-6 px-2 text-xs"
+                                  className="h-6 px-2 text-xs flex-shrink-0"
                                 >
                                   <Info className="h-3 w-3 mr-1" />
                                   Sources ({message.sources.length})
@@ -413,14 +415,14 @@ const SarkarQnA = () => {
                           <div className="mt-3 space-y-2 mr-2">
                             <h4 className="text-sm font-semibold">Relevant Schemes:</h4>
                             {message.relevantSchemes.slice(0, 3).map((scheme, index) => (
-                              <div key={index} className="p-3 bg-accent/30 rounded-lg">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium">{scheme.name}</span>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {Math.round(scheme.similarity * 100)}% match
+                              <div key={index} className="p-3 bg-accent/30 rounded-lg break-words overflow-hidden">
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <span className="text-sm font-medium break-words flex-1">{scheme.name}</span>
+                                  <Badge variant="secondary" className="text-xs flex-shrink-0">
+                                    {scheme.category || 'General'}
                                   </Badge>
                                 </div>
-                                <p className="text-sm opacity-70">{scheme.description}</p>
+                                <p className="text-sm opacity-70 break-words">{scheme.category}</p>
                               </div>
                             ))}
                           </div>

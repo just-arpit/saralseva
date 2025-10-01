@@ -127,4 +127,35 @@ All colors MUST be HSL. Inspired by Digital India and modern government portals.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Prevent text overflow globally */
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  /* Chat message improvements */
+  .chat-message {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+  }
+
+  /* Prevent horizontal scrolling */
+  .prevent-overflow {
+    overflow-x: hidden;
+    word-wrap: break-word;
+  }
+}
+
+/* Additional chat-specific styles */
+.chat-container {
+  overflow-x: hidden;
+}
+
+.chat-container * {
+  max-width: 100%;
+  box-sizing: border-box;
 }
