@@ -141,6 +141,7 @@ const SarkarQnA = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [showSources, setShowSources] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -196,6 +197,11 @@ const SarkarQnA = () => {
     const saved = localStorage.getItem('sarkarQnA_recentQueries');
     if (saved) {
       setRecentQueries(JSON.parse(saved));
+    }
+    
+    // Check speech recognition support
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setSpeechSupported(true);
     }
   }, []);
 
@@ -272,8 +278,72 @@ const SarkarQnA = () => {
   };
 
   const toggleVoiceInput = () => {
-    setIsListening(!isListening);
-    // Voice recognition implementation would go here
+    if (!speechSupported) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      // Stop listening
+      setIsListening(false);
+      return;
+    }
+
+    // Start voice recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.lang = selectedLanguage === 'hi' ? 'hi-IN' : 'en-IN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInputMessage(transcript);
+      setIsListening(false);
+      
+      // Auto-send after voice input
+      setTimeout(() => {
+        if (transcript.trim()) {
+          const userMessage = {
+            id: Date.now(),
+            type: 'user',
+            content: transcript,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, userMessage]);
+          setInputMessage('');
+          setIsTyping(true);
+          
+          // Generate response
+          generateLocalQnAResponse(transcript).then(botResponse => {
+            setMessages(prev => [...prev, botResponse]);
+            setIsTyping(false);
+          });
+        }
+      }, 100);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      
+      if (event.error === 'not-allowed') {
+        alert('Microphone access denied. Please allow microphone access and try again.');
+      } else if (event.error === 'no-speech') {
+        alert('No speech detected. Please try again.');
+      }
+    };
+    
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    
+    recognition.start();
   };
 
   const formatTime = (timestamp) => {
@@ -352,17 +422,23 @@ const SarkarQnA = () => {
                     </div>
                   )}
 
-                  {messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                  {messages.map((message, index) => (
+                    <div 
+                      key={message.id} 
+                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4 ${
+                        message.type === 'user' ? 'message-user' : 'message-bot'
+                      }`}
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
                       <div className={`max-w-[85%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
                         <div
-                          className={`p-4 rounded-lg break-words overflow-hidden ${
+                          className={`p-4 rounded-lg break-words overflow-hidden shadow-sm border ${
                             message.type === 'user'
-                              ? 'bg-primary text-primary-foreground ml-2'
-                              : 'bg-muted mr-2'
+                              ? 'bg-primary text-primary-foreground ml-2 chatbot-container'
+                              : 'bg-muted mr-2 chatbot-container'
                           }`}
                         >
-                          <div className="text-sm whitespace-pre-wrap break-words word-wrap overflow-wrap-anywhere">
+                          <div className="text-sm whitespace-pre-wrap break-words word-wrap overflow-wrap-anywhere message-content">
                             {message.content}
                           </div>
                           

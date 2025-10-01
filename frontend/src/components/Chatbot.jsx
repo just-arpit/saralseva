@@ -328,10 +328,10 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
               variant="outline"
               size="sm"
               onClick={() => handleQuickAction(action.query)}
-              className="justify-start text-xs h-8"
+              className="justify-start text-xs h-8 btn-enhanced transition-all duration-200 hover:scale-105 hover:shadow-sm"
             >
-              <action.icon className="h-3 w-3 mr-1" />
-              {action.label}
+              <action.icon className="h-3 w-3 mr-1 flex-shrink-0" />
+              <span className="truncate">{action.label}</span>
             </Button>
           ))}
         </div>
@@ -339,14 +339,20 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+        {messages.map((message, index) => (
+          <div 
+            key={message.id} 
+            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} ${
+              message.type === 'user' ? 'message-user' : 'message-bot'
+            }`}
+            style={{ animationDelay: `${index * 0.1}s` }}
+          >
             <div className={`max-w-[85%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
               <div
-                className={`p-3 rounded-lg break-words ${
+                className={`p-3 rounded-lg break-words shadow-sm border transition-all duration-200 hover:shadow-md ${
                   message.type === 'user'
-                    ? 'bg-primary text-primary-foreground ml-2'
-                    : 'bg-muted mr-2'
+                    ? 'bg-primary text-primary-foreground ml-2 chatbot-container'
+                    : 'bg-muted mr-2 chatbot-container'
                 }`}
               >
                 <div className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">
@@ -466,18 +472,24 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Type your message..."
-              className="w-full pl-3 pr-12 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              placeholder={isListening ? "🎤 Listening..." : "Type your message... (Press Enter to send)"}
+              className="w-full pl-3 pr-12 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm transition-all duration-200 resize-none"
+              disabled={isTyping}
             />
             <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleVoiceInput}
-                className={`h-6 w-6 ${isListening ? 'text-destructive' : 'text-muted-foreground'}`}
+                className={`h-6 w-6 transition-all duration-200 ${
+                  isListening 
+                    ? 'text-red-500 bg-red-50 voice-active animate-pulse' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
+                title={isListening ? "Stop listening" : "Start voice input"}
               >
-                <Mic className="h-3 w-3" />
+                <Mic className={`h-3 w-3 ${isListening ? 'animate-pulse' : ''}`} />
               </Button>
             </div>
           </div>
@@ -485,9 +497,10 @@ const Chatbot = ({ isMinimized = false, onToggleMinimize, onClose }) => {
             onClick={handleSendMessage}
             disabled={!inputMessage.trim() || isTyping}
             size="icon"
-            className="h-10 w-10"
+            className="h-10 w-10 btn-enhanced transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Send message"
           >
-            <Send className="h-4 w-4" />
+            <Send className={`h-4 w-4 ${isTyping ? 'animate-pulse' : ''}`} />
           </Button>
         </div>
         
