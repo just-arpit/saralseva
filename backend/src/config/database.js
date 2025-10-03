@@ -6,14 +6,16 @@ export const connectDB = async () => {
     console.log('🔄 Attempting to connect to MongoDB Atlas...');
     
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000, // Increased timeout
+      serverSelectionTimeoutMS: 30000, // Increased timeout for Atlas
       socketTimeoutMS: 45000,
       maxPoolSize: 10,
-      bufferCommands: false,
+      bufferCommands: true, // Allow buffering commands until connection is ready
+      retryWrites: true, // Enable retry writes for Atlas
     });
 
-    console.log(`📊 MongoDB Connected Successfully: ${conn.connection.host}`);
+    console.log(`📊 MongoDB Atlas Connected Successfully: ${conn.connection.host}`);
     console.log(`📁 Database: ${conn.connection.name}`);
+    console.log(`🌍 Atlas Cluster: Connected`);
     
     // Handle connection events
     mongoose.connection.on('error', (err) => {

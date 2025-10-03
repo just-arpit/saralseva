@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button, Card, CardContent, CardHeader, CardTitle, Separator, Badge } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/hooks";
+import OAuthLogin from "@/components/OAuthLogin";
 import { 
   User, 
   Mail, 
@@ -181,6 +182,20 @@ const Register = () => {
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* OAuth Registration Options */}
+            <OAuthLogin type="register" />
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">
+                  या मैन्युअल रजिस्ट्रेशन करें
+                </span>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">

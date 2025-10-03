@@ -1,6 +1,16 @@
 // Load environment variables first
 import dotenv from 'dotenv';
-dotenv.config();
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '.env') });
+
+// Verify environment variables are loaded
+console.log('🔍 Environment check at server start:');
+console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Found' : 'Missing');
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -10,6 +20,7 @@ import morgan from 'morgan';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
 
 // Import routes
 import authRoutes from './src/routes/auth.js';
@@ -24,10 +35,14 @@ import dashboardRoutes from './src/routes/dashboard.js';
 import chatbotRoutes from './src/routes/chatbot.js';
 import taxRoutes from './src/routes/tax.js';
 import qaRoutes from './src/routes/qa.js';
+import oauthRoutes from './src/routes/oauth.js';
 
 // Import middleware
 import { errorHandler } from './src/middleware/errorHandler.js';
 import { notFound } from './src/middleware/notFound.js';
+
+// Import passport after env variables are loaded
+import passport, { configurePassport } from './src/config/passport.js';
 
 // Import config
 import { connectDB } from './src/config/database.js';
@@ -36,8 +51,35 @@ import { swaggerSpec, swaggerUi } from './src/config/swagger.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to database
-connectDB();
+// Async function to start the server
+const startServer = async () => {
+  try {
+    // Connect to database first
+    console.log('🔄 Connecting to database...');
+    await connectDB();
+    console.log('✅ Database connected successfully');
+
+    // Configure passport with environment variables
+    configurePassport();
+    console.log('✅ Passport configured');
+
+    // Start server only after database is connected
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Saral Seva Backend running on port ${PORT}`);
+      console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+      console.log(`🏥 Health check available at http://localhost:${PORT}/health`);
+    }).on('error', (err) => {
+      console.error('❌ Server startup error:', err);
+      if (err.code === 'EADDRINUSE') {
+        console.error(`⚠️  Port ${PORT} is already in use. Please use a different port or kill the existing process.`);
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
 // Rate limiting
 const limiter = rateLimit({
@@ -58,11 +100,27 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Session configuration for OAuth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
 // CORS configuration
 app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:8080',
+    'http://localhost:8081',
     'http://localhost:3000',
     'https://saral-seva-frontend.onrender.com',
     process.env.FRONTEND_URL || 'http://localhost:5173'
@@ -90,6 +148,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/auth', oauthRoutes); // OAuth routes (no /api prefix)
 app.use('/api/users', userRoutes);
 app.use('/api/schemes', schemeRoutes);
 app.use('/api/events', eventRoutes);
@@ -116,16 +175,7 @@ app.get('/', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Saral Seva Backend running on port ${PORT}`);
-  console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
-  console.log(`🏥 Health check available at http://localhost:${PORT}/health`);
-}).on('error', (err) => {
-  console.error('❌ Server startup error:', err);
-  if (err.code === 'EADDRINUSE') {
-    console.error(`⚠️  Port ${PORT} is already in use. Please use a different port or kill the existing process.`);
-  }
-});
+// Start the server
+startServer();
 
 export default app;

@@ -4,6 +4,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Separator } from "@/c
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/hooks";
+import OAuthLogin from "@/components/OAuthLogin";
 import { 
   User, 
   Lock, 
@@ -251,36 +252,8 @@ const Login = () => {
               </Button>
             </form>
 
-            <div className="space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-                </div>
-              </div>
-
-              {/* Social Login Options */}
-              <div className="space-y-2">
-                {socialLogins.map((provider) => (
-                  <Button
-                    key={provider.id}
-                    variant="outline"
-                    onClick={() => handleSocialLogin(provider.id)}
-                    className="w-full justify-start"
-                  >
-                    <div className={`p-1 rounded ${provider.bgColor} mr-3`}>
-                      <provider.icon className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="font-medium">{provider.name}</div>
-                      <div className="text-xs text-muted-foreground">{provider.description}</div>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-            </div>
+            {/* OAuth Login Options */}
+            <OAuthLogin type="login" />
 
             {/* Register Link */}
             <div className="text-center">
